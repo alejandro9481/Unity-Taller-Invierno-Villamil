@@ -205,6 +205,44 @@ public static class ConstructorEscena
         return mat;
     }
 
+    // ------------------------------------------------------------------ Etapa 3
+    [MenuItem("Taller/3. Luces y sirenas de emergencia")]
+    public static void Etapa3_Sirenas()
+    {
+        var escena = AbrirEscena();
+        var coche = Buscar(escena, "Police_Car");
+
+        // 6. Siren_Pivot: vacío en el centro de la barra de luces del techo. El script se agrega en la etapa 4.
+        var pivote = Buscar(escena, "Siren_Pivot") ?? new GameObject("Siren_Pivot");
+        pivote.transform.SetParent(coche.transform, false);
+        pivote.transform.localPosition = new Vector3(0f, 1.72f, -0.2f);
+        pivote.transform.localRotation = Quaternion.identity;
+
+        // 7 y 8. Red_Light y Blue_Light: spots hijos del pivote, apuntando a lados opuestos
+        // e inclinados un poco hacia abajo para que el haz barra la nieve al girar.
+        CrearSirena(escena, pivote.transform, "Red_Light", new Color(1f, 0.05f, 0.05f), +1f);
+        CrearSirena(escena, pivote.transform, "Blue_Light", new Color(0.05f, 0.2f, 1f), -1f);
+
+        EditorSceneManager.SaveScene(escena);
+        Debug.Log("[Taller] Etapa 3 lista: pivote y luces de las sirenas");
+    }
+
+    static void CrearSirena(Scene escena, Transform pivote, string nombre, Color color, float lado)
+    {
+        var go = Buscar(escena, nombre) ?? new GameObject(nombre);
+        go.transform.SetParent(pivote, false);
+        go.transform.localPosition = new Vector3(0.35f * lado, 0f, 0f);
+        go.transform.localRotation = Quaternion.Euler(15f, 90f * lado, 0f);
+        var luz = Componente<Light>(go);
+        luz.type = LightType.Spot;
+        luz.color = color;
+        luz.intensity = 25f;
+        luz.range = 25f;
+        luz.spotAngle = 70f;
+        luz.innerSpotAngle = 30f;
+        luz.shadows = LightShadows.None;   // sin sombras: la barra de luces no tapa el haz
+    }
+
     // ------------------------------------------------------------------ utilidades
     // Abre la escena de la etapa anterior; las etapas 2 a 5 parten de ella.
     static Scene AbrirEscena()
