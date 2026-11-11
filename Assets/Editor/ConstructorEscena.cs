@@ -243,6 +243,19 @@ public static class ConstructorEscena
         luz.shadows = LightShadows.None;   // sin sombras: la barra de luces no tapa el haz
     }
 
+    // ------------------------------------------------------------------ Etapa 4
+    [MenuItem("Taller/4. Asignar SirenRotation al pivote")]
+    public static void Etapa4_Script()
+    {
+        var escena = AbrirEscena();
+        var pivote = Buscar(escena, "Siren_Pivot");
+        // El script va únicamente en Siren_Pivot: las luces giran por ser sus hijas.
+        var giro = Componente<SirenRotation>(pivote);
+        giro.rotationSpeed = 180f;   // media vuelta por segundo
+        EditorSceneManager.SaveScene(escena);
+        Debug.Log("[Taller] Etapa 4 lista: SirenRotation en Siren_Pivot");
+    }
+
     // ------------------------------------------------------------------ utilidades
     // Abre la escena de la etapa anterior; las etapas 2 a 5 parten de ella.
     static Scene AbrirEscena()
