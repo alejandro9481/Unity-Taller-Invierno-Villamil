@@ -256,6 +256,164 @@ public static class ConstructorEscena
         Debug.Log("[Taller] Etapa 4 lista: SirenRotation en Siren_Pivot");
     }
 
+    // ------------------------------------------------------------------ Etapa 5
+    // Material de partículas por defecto de URP (Particles/Unlit, transparente, textura suave).
+    const string GuidParticulaURP = "e823cd5b5d27c0f4b8256e7c12ee3e6d";
+
+    [MenuItem("Taller/5. Partículas de nieve y humo")]
+    public static void Etapa5_Particulas()
+    {
+        var escena = AbrirEscena();
+
+        // 9. Exhaust_Smoke: hijo de Police_Car, en el escape trasero, apenas sobre la nieve.
+        var coche = Buscar(escena, "Police_Car");
+        var humoGO = Buscar(escena, "Exhaust_Smoke") ?? new GameObject("Exhaust_Smoke");
+        humoGO.transform.SetParent(coche.transform, false);
+        humoGO.transform.localPosition = new Vector3(-0.55f, 0.65f, -2.25f);
+        humoGO.transform.localRotation = Quaternion.Euler(-25f, 180f, 0f);   // hacia atrás y un poco arriba
+        ConfigurarHumo(Componente<ParticleSystem>(humoGO), MatParticula("Humo_Particula", Color.white));
+
+        // 10. Global_Blizzard: independiente, a 14 m de altura, emitiendo hacia abajo.
+        var nieveGO = Buscar(escena, "Global_Blizzard") ?? new GameObject("Global_Blizzard");
+        nieveGO.transform.SetParent(null);
+        nieveGO.transform.position = new Vector3(-3f, 12f, 4f);   // corrida contra el viento
+        nieveGO.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        ConfigurarNevada(Componente<ParticleSystem>(nieveGO), MatParticula("Nieve_Particula", Color.white));
+
+        EditorSceneManager.SaveScene(escena);
+        Debug.Log("[Taller] Etapa 5 lista: nevada y humo del escape");
+    }
+
+    static void ConfigurarNevada(ParticleSystem ps, Material material)
+    {
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.duration = 10f;
+        main.loop = true;
+        main.prewarm = true;                                             // al dar Play ya está nevando
+        main.startLifetime = new ParticleSystem.MinMaxCurve(5f, 6f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1f, 2.5f);      // velocidad inicial variable
+        main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.16f);
+        main.startColor = new Color(0.85f, 0.93f, 1f, 0.9f);              // blanco con tono azul claro
+        main.gravityModifier = 0.1f;                                     // gravedad moderada
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 20000;
+
+        var emision = ps.emission;
+        emision.enabled = true;
+        emision.rateOverTime = 3500f;                                    // tormenta densa
+
+        // Caja de 30 x 30 m: con la rotación X = 90 queda horizontal y emite hacia abajo.
+        var forma = ps.shape;
+        forma.enabled = true;
+        forma.shapeType = ParticleSystemShapeType.Box;
+        forma.scale = new Vector3(30f, 30f, 1f);
+
+        // Viento lateral: la nieve cae en diagonal, como en una ventisca.
+        var velocidad = ps.velocityOverLifetime;
+        velocidad.enabled = true;
+        velocidad.space = ParticleSystemSimulationSpace.World;
+        velocidad.x = new ParticleSystem.MinMaxCurve(2.5f);
+        velocidad.y = new ParticleSystem.MinMaxCurve(0f);
+        velocidad.z = new ParticleSystem.MinMaxCurve(0f);
+
+        // Remolinos suaves para que los copos no caigan en línea recta.
+        var ruido = ps.noise;
+        ruido.enabled = true;
+        ruido.strength = 0.6f;
+        ruido.frequency = 0.3f;
+
+        var render = ps.GetComponent<ParticleSystemRenderer>();
+        render.renderMode = ParticleSystemRenderMode.Billboard;
+        render.sharedMaterial = material;
+        render.shadowCastingMode = ShadowCastingMode.Off;
+        render.receiveShadows = false;
+    }
+
+    static void ConfigurarHumo(ParticleSystem ps, Material material)
+    {
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.duration = 5f;
+        main.loop = true;
+        main.prewarm = true;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(2f, 3.5f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 1f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.25f, 0.45f);
+        main.startColor = Color.white;                                   // el gris lo pone Color over Lifetime
+        main.gravityModifier = -0.05f;                                   // el humo caliente sube
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 200;
+
+        // Emisión constante más ráfagas irregulares: el motor "tose" por el frío.
+        var emision = ps.emission;
+        emision.enabled = true;
+        emision.rateOverTime = 12f;
+        emision.SetBursts(new[]
+        {
+            new ParticleSystem.Burst(0.0f, 6, 10),
+            new ParticleSystem.Burst(1.3f, 6, 10),
+            new ParticleSystem.Burst(2.1f, 6, 10),
+            new ParticleSystem.Burst(3.9f, 6, 10),
+        });
+
+        // Cono muy estrecho: sale del tubo de escape.
+        var forma = ps.shape;
+        forma.enabled = true;
+        forma.shapeType = ParticleSystemShapeType.Cone;
+        forma.angle = 6f;
+        forma.radius = 0.04f;
+
+        // De gris oscuro a transparente.
+        var colorVida = ps.colorOverLifetime;
+        colorVida.enabled = true;
+        var degradado = new Gradient();
+        degradado.SetKeys(
+            new[] { new GradientColorKey(new Color(0.3f, 0.3f, 0.32f), 0f), new GradientColorKey(new Color(0.62f, 0.63f, 0.66f), 1f) },
+            new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.85f, 0.1f), new GradientAlphaKey(0f, 1f) });
+        colorVida.color = new ParticleSystem.MinMaxGradient(degradado);
+
+        // Tamaño creciente: la bocanada se expande al enfriarse (0.5x a 2.5x).
+        var tamanoVida = ps.sizeOverLifetime;
+        tamanoVida.enabled = true;
+        tamanoVida.size = new ParticleSystem.MinMaxCurve(2.5f, AnimationCurve.Linear(0f, 0.2f, 1f, 1f));
+
+        // El mismo viento que la nieve, más suave.
+        var velocidad = ps.velocityOverLifetime;
+        velocidad.enabled = true;
+        velocidad.space = ParticleSystemSimulationSpace.World;
+        velocidad.x = new ParticleSystem.MinMaxCurve(1.2f);
+        velocidad.y = new ParticleSystem.MinMaxCurve(0f);
+        velocidad.z = new ParticleSystem.MinMaxCurve(0f);
+
+        var ruido = ps.noise;
+        ruido.enabled = true;
+        ruido.strength = 0.3f;
+        ruido.frequency = 0.5f;
+
+        var render = ps.GetComponent<ParticleSystemRenderer>();
+        render.renderMode = ParticleSystemRenderMode.Billboard;
+        render.sharedMaterial = material;
+        render.shadowCastingMode = ShadowCastingMode.Off;
+        render.receiveShadows = false;
+        render.sortingFudge = -10f;   // se dibuja delante de la nieve cercana
+    }
+
+    // Copia del material de partículas de URP guardada en Assets/Materials.
+    static Material MatParticula(string nombre, Color color)
+    {
+        System.IO.Directory.CreateDirectory(CarpetaMateriales);
+        string ruta = CarpetaMateriales + "/" + nombre + ".mat";
+        var existente = AssetDatabase.LoadAssetAtPath<Material>(ruta);
+        if (existente != null) return existente;
+        var baseURP = AssetDatabase.LoadAssetAtPath<Material>(AssetDatabase.GUIDToAssetPath(GuidParticulaURP));
+        if (baseURP == null) throw new System.Exception("No se encontró el material de partículas de URP.");
+        var mat = new Material(baseURP) { name = nombre };
+        mat.SetColor("_BaseColor", color);
+        AssetDatabase.CreateAsset(mat, ruta);
+        return mat;
+    }
+
     // ------------------------------------------------------------------ utilidades
     // Abre la escena de la etapa anterior; las etapas 2 a 5 parten de ella.
     static Scene AbrirEscena()
